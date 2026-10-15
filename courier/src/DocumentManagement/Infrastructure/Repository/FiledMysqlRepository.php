@@ -297,7 +297,7 @@ class FiledMysqlRepository extends ServiceEntityRepository implements FiledRepos
             ->createQueryBuilder()
             ->select('f', 'i', 'd')
             ->from('App\DocumentManagement\Domain\Entity\Filed', 'f')
-            ->where('(f.created_at >= :date_start AND f.created_at <= :date_end) OR (d.in_plane IS NULL and f.created_at <= :date_end)')
+            ->where('(f.created_at >= :date_start AND f.created_at <= :date_end) OR (d.in_plane = false AND f.created_at <= :date_end)')
             ->setParameter('date_start', $queryDateStart)
             ->setParameter('date_end', $queryDateEnd)
             ->leftJoin('f.identification', 'i')
