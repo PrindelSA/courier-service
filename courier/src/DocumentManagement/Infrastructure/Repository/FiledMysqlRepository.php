@@ -267,7 +267,7 @@ class FiledMysqlRepository extends ServiceEntityRepository implements FiledRepos
             ->getArrayResult();
     }
 
-    function getDocumentsWithoutRoute() : array
+    function getDocumentsWithoutRoute(int $days = 0) : array
     {
         return $this->getEntityManager()
             ->createQueryBuilder()
@@ -276,7 +276,7 @@ class FiledMysqlRepository extends ServiceEntityRepository implements FiledRepos
             ->join('f.documents', 'd')
             ->where('d.created_at >= :date_start')
             ->andWhere('d.ruta IS NULL')
-            ->setParameter('date_start', new \DateTime('today'))
+            ->setParameter('date_start', (new \DateTime('today'))->modify('-' . $days . ' days'))
             ->getQuery()
             ->getArrayResult();
     }
@@ -297,7 +297,12 @@ class FiledMysqlRepository extends ServiceEntityRepository implements FiledRepos
             ->createQueryBuilder()
             ->select('f', 'i', 'd')
             ->from('App\DocumentManagement\Domain\Entity\Filed', 'f')
-            ->where('(f.created_at >= :date_start AND f.created_at <= :date_end) OR (d.in_plane = false AND f.created_at <= :date_end)')
+            ->where('f.created_at <= :date_end')
+            ->andWhere('(f.created_at >= :date_start OR d.in_plane = false)')
+            // Un radicado sale en el plano una sola vez y completo: nunca si alguno de sus documentos ya fue reportado...
+            ->andWhere('NOT EXISTS (SELECT 1 FROM App\DocumentManagement\Domain\Entity\Document dr WHERE dr.fk_radicado = f.id_radicado AND dr.in_plane = true)')
+            // ...ni mientras alguno de sus documentos siga sin descargar.
+            ->andWhere("NOT EXISTS (SELECT 1 FROM App\DocumentManagement\Domain\Entity\Document dn WHERE dn.fk_radicado = f.id_radicado AND (dn.ruta IS NULL OR dn.ruta = ''))")
             ->setParameter('date_start', $queryDateStart)
             ->setParameter('date_end', $queryDateEnd)
             ->leftJoin('f.identification', 'i')

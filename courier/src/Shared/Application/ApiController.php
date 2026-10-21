@@ -72,7 +72,7 @@ class ApiController
                 $this->getDocumentFile($documentArrayObj, $existFiled[0]->getCodigoGuia());
                 $this->logger->notice('Fin de descarga del radicado '.$comunicacionVo->NumRadicado);
 
-                $response->setCodGuia($existFiled->getCodigoGuia());
+                $response->setCodGuia($existFiled[0]->getCodigoGuia());
                 $response->setNumTramite($comunicacionVo->NumTramite);
                 $this->logger->notice('Response ' . $comunicacionVo->NumRadicado, [$response]);
                 return $response;
@@ -147,16 +147,22 @@ class ApiController
      */
     private function getDocumentFile(array $documents, string $guideNumber): void
     {
-        $command = null;
-        try {
-            foreach ($documents as $document) {
-                $command = new GetDocumentFileCommand($document->getIdDocumento(), $guideNumber);
-                $this->dispatch($command);
+        $failedIds = [];
+        $messages = [];
+        foreach ($documents as $document) {
+            // Un fallo no debe impedir el intento de los demas documentos del radicado.
+            try {
+                $this->dispatch(new GetDocumentFileCommand($document->getIdDocumento(), $guideNumber));
+            } catch (\Exception $exception) {
+                $failedIds[] = $document->getIdDocumento();
+                $messages[] = $document->getIdDocumento() . ': ' . $this->getPrevious($exception)->getMessage();
             }
-        } catch (\Exception $exception) {
-            $e = $this->getPrevious($exception);
-            $e = new GetDocumentException($e->getMessage());
-            $e->setDocumentId($command->getDocumentId());
+        }
+
+        if (count($failedIds) > 0) {
+            $e = new GetDocumentException(implode(' | ', $messages));
+            // La columna del log es varchar(255).
+            $e->setDocumentId(mb_substr(implode(',', $failedIds), 0, 255));
             throw $e;
         }
     }

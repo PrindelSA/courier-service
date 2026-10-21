@@ -34,6 +34,7 @@ class GenerateReportCommand extends Command
                 'TipoProceso', 'RadicadoCasoPadre', 'UsuarioSolicitante', 'FechaDeCreacion'
             ];
             $content = implode($delimiter, $headers).PHP_EOL;
+            $documentIdsInPlane = [];
             foreach ($filed as $item) {
                 $documents = $item['documents'];
 
@@ -46,7 +47,7 @@ class GenerateReportCommand extends Command
                     if (!isset($document['ruta']) || $document['ruta'] == '') {
                         continue;
                     }
-                    $this->repository->updateInPlane($document['id_documento']);
+                    $documentIdsInPlane[] = $document['id_documento'];
                     $content .= $this->createTxtForFile($item, $delimiter, $document['id_gestor_documento'].'.pdf'.$delimiter);
                 }
             }
@@ -55,6 +56,11 @@ class GenerateReportCommand extends Command
             $fp = fopen("public/planos/radicados-".$date->format('Y-m-d').'.txt',"w");
             fwrite($fp,$content);
             fclose($fp);
+
+            // Se marca como reportado solo despues de escribir el plano.
+            foreach ($documentIdsInPlane as $documentId) {
+                $this->repository->updateInPlane($documentId);
+            }
             $output->writeln('[' . date('Y-m-d H:i:s') . '] -- Fin job para generar el plano con las guias recibidas --');
             return Command::SUCCESS;
         } catch (\Exception $e) {
