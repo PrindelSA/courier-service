@@ -53,7 +53,9 @@ class DocumentMysqlRepository extends ServiceEntityRepository implements Documen
             throw new DocumentNotExistException('El radicado de este documento no existe.');
         }
 
-        $exist = $this->getEntityManager()
+        // A filing may carry the same document id more than once; the file path depends only
+        // on the id, so every matching row must be updated or the duplicates stay without route.
+        $documents = $this->getEntityManager()
             ->createQueryBuilder()
             ->select('d')
             ->from('App\DocumentManagement\Domain\Entity\Document', 'd')
@@ -61,16 +63,17 @@ class DocumentMysqlRepository extends ServiceEntityRepository implements Documen
             ->andWhere('d.fk_radicado = :filedId')
             ->setParameter('documentId', $documentId)
             ->setParameter('filedId', $filed->getIdRadicado())
-            ->setMaxResults(1)
             ->getQuery()
-            ->getOneOrNullResult();
+            ->getResult();
 
-        if (!isset($exist)) {
+        if (empty($documents)) {
             throw new DocumentNotExistException('El documento no existe.');
         }
 
-        $exist->setRuta('files/'.$documentId.'.pdf');
-        $this->registry->getManager()->persist($exist);
+        foreach ($documents as $document) {
+            $document->setRuta('files/'.$documentId.'.pdf');
+            $this->registry->getManager()->persist($document);
+        }
         $this->registry->getManager()->flush();
     }
 
